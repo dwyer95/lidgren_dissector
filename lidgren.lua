@@ -162,12 +162,12 @@ local vs_funcs = {
 
 -- f_func, abbreviated for filters, function or func?
 local f_func = ProtoField.uint8("lidgren.function", "Function", base.DEC, vs_funcs) 
-local f_mseq = ProtoField.uint16("lidgren.mseq", "MessageSequence", base.DEC_HEX) 
+local f_mseq = ProtoField.uint16("lidgren.mseq", "MessageSequence", base.DEC_HEX, nil, 65534) 
 --65279
---local f_fragm= ProtoField.bool("lidgren.fragm", "Fragmented", base.DEC) --, 256
-local f_len  = ProtoField.uint16("lidgren.len", "Length", base.DEC_HEX)
+local f_fragm= ProtoField.uint16("lidgren.fragm", "Fragmented", base.DEC, nil, 1) --, 256
+local f_len  = ProtoField.uint16("lidgren.len", "Payload Length", base.DEC_HEX)
 
-lidgren_proto.fields = {f_func, f_mseq, f_len}
+lidgren_proto.fields = {f_func, f_mseq, f_len, f_fragm}
 
 -- the dissection function
 function lidgren_proto.dissector(buffer, pinfo, tree)
@@ -181,14 +181,16 @@ function lidgren_proto.dissector(buffer, pinfo, tree)
     -- Första byten i headern är function
     tree_header:add(f_func, buffer(offset, 1))
     -- Andra och tredje byten i headern: message sequence number, kanske
-    tree_header:add(f_mseq, buffer(offset + 1, 2))
-    --tree_header:add(f_fragm, buffer(offset + 1, 2))
+
+    tree_header:add_le(f_mseq, buffer(offset +1, 2))-- buffer(offset + 1, 2))
+    tree_header:add_le(f_fragm, buffer(offset + 1, 2))
     -- Fjärde och femte byten i headern: längden på meddelandet, incremented by 8.
     tree_header:add_le(f_len, buffer(offset + 3, 2))
 
-    offset = offset+5
-
+    
     local func_code = buffer(offset, 1):uint()
+    
+    offset = offset+5
 
     -- Puts function name from table into info column in wireshark
     pinfo.cols['info'] = vs_funcs[func_code]
@@ -200,7 +202,29 @@ function lidgren_proto.dissector(buffer, pinfo, tree)
     --end
 end
 
+local function heuristic_checker(buffer, pinfo, tree)
+
+    length = buffer:len()
+    if length < 5 then return false end
+
+    if length > 1413 then return false end
+
+    local potential_msg_id = buffer(0,1):uint()
+    if potential_msg_id < 141
+    then
+        lidgren_proto.dissector(buffer, pinfo, tree)
+        return true
+    else return false end
+end
+
 -- load the udp port table
 udp_table = DissectorTable.get("udp.port")
 -- register the protocol to port 14242
-udp_table:add(14242, lidgren_proto)
+--udp_table:add(14242, lidgren_proto)
+
+
+-- Fragmentation/sequence number division
+-- Endian
+
+lidgren_proto:register_heuristic("udp", heuristic_checker)
+
