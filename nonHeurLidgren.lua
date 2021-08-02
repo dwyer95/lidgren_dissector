@@ -190,36 +190,6 @@ function lidgren_proto.dissector(buffer, pinfo, tree)
     pinfo.cols['info'] = vs_funcs[func_code]
 end
 
-
-function lidgren_proto.dissector(buffer, pinfo, tree)
-
-    pinfo.cols['protocol'] = "Lidgren"
-    
-    local tree_lidgren = tree:add(lidgren_proto, buffer())
-    local offset = 0
-
-    local tree_header = tree_lidgren:add(buffer(offset, 5), "Header")
-    -- Första byten i headern är function
-    tree_header:add(f_func, buffer(offset, 1))
-    -- Andra och tredje byten i headern: message sequence number, kanske
-
-    tree_header:add_le(f_mseq, buffer(offset +1, 2))-- buffer(offset + 1, 2))
-    tree_header:add_le(f_fragm, buffer(offset + 1, 2))
-    -- Fjärde och femte byten i headern: längden på meddelandet, incremented by 8.
-    tree_header:add_le(f_len, buffer(offset + 3, 2))
-    
-    local func_code = buffer(offset, 1):uint()
-    
-    offset = offset+5
-
-    --Adds the payload content to the lidgren tree
-    tree_lidgren:add(f_payload, buffer(offset))
-
-    -- Puts function name from table into info column in wireshark
-    pinfo.cols['info'] = vs_funcs[func_code]
-end
-
-
 -- load the udp port table
 udp_table = DissectorTable.get("udp.port")
 --register the protocol to port 14242
