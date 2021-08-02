@@ -161,7 +161,6 @@ local f_len  = ProtoField.uint16("lidgren.len", "Payload Length", base.DEC_HEX)
 
 lidgren_proto.fields = {f_func, f_mseq, f_len, f_fragm}
 
-
 -- the dissection function
 function lidgren_proto.dissector(buffer, pinfo, tree)
 
