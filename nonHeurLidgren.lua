@@ -154,19 +154,43 @@ local vs_funcs = {
 }
 
 -- declaring header fields
-
--- f_func, abbreviated for filters, function or func?
 local f_func = ProtoField.uint8("lidgren.function", "Function", base.DEC, vs_funcs) 
 local f_mseq = ProtoField.uint16("lidgren.mseq", "MessageSequence", base.DEC_HEX, nil, 65534) 
---65279
-local f_fragm= ProtoField.uint16("lidgren.fragm", "Fragmented", base.DEC, nil, 1) --, 256
-local f_len  = ProtoField.uint16("lidgren.len", "Payload Length (in bits)", base.DEC_HEX)
+local f_fragm= ProtoField.uint16("lidgren.fragm", "Fragmented", base.DEC, nil, 1)
+local f_len  = ProtoField.uint16("lidgren.len", "Payload Length", base.DEC_HEX)
 
-local f_payload = ProtoField.bytes("lidgren.payload", "Payload",base.NONE)
+lidgren_proto.fields = {f_func, f_mseq, f_len, f_fragm}
 
-lidgren_proto.fields = {f_func, f_mseq, f_len, f_fragm,f_payload}
 
 -- the dissection function
+function lidgren_proto.dissector(buffer, pinfo, tree)
+
+    pinfo.cols['protocol'] = "Lidgren"
+    
+    local tree_lidgren = tree:add(lidgren_proto, buffer())
+    local offset = 0
+
+    local tree_header = tree_lidgren:add(buffer(offset, 5), "Header")
+	
+    -- 1st byte in header = function code
+    tree_header:add(f_func, buffer(offset, 1))
+
+    --2nd and 3rd bytes = message sequence number and fragmentation flag
+    tree_header:add_le(f_mseq, buffer(offset +1, 2))
+    tree_header:add_le(f_fragm, buffer(offset + 1, 2))
+
+    -- 4th and 5th bytes = message length, incremented by 8.
+    tree_header:add_le(f_len, buffer(offset + 3, 2))
+
+    local func_code = buffer(offset, 1):uint()
+    
+    offset = offset+5
+
+    -- puts function name from table into info column in wireshark
+    pinfo.cols['info'] = vs_funcs[func_code]
+end
+
+
 function lidgren_proto.dissector(buffer, pinfo, tree)
 
     pinfo.cols['protocol'] = "Lidgren"
@@ -183,9 +207,6 @@ function lidgren_proto.dissector(buffer, pinfo, tree)
     tree_header:add_le(f_fragm, buffer(offset + 1, 2))
     -- Fjärde och femte byten i headern: längden på meddelandet, incremented by 8.
     tree_header:add_le(f_len, buffer(offset + 3, 2))
-
-
-
     
     local func_code = buffer(offset, 1):uint()
     
@@ -196,12 +217,6 @@ function lidgren_proto.dissector(buffer, pinfo, tree)
 
     -- Puts function name from table into info column in wireshark
     pinfo.cols['info'] = vs_funcs[func_code]
-
-    --if func_code == 67 then
-        -- UserReliableOrdered1 (actual msg)
-        --tree_header:add()
-    
-    --end
 end
 
 
@@ -209,9 +224,3 @@ end
 udp_table = DissectorTable.get("udp.port")
 --register the protocol to port 14242
 udp_table:add(14242, lidgren_proto)
-
-
--- Fragmentation/sequence number division
--- Endian
-
---lidgren_proto:register_heuristic("udp", heuristic_checker)
