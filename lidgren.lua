@@ -174,11 +174,11 @@ function lidgren_proto.dissector(buffer, pinfo, tree)
     -- 1st byte in header = function code
     tree_header:add(f_func, buffer(offset, 1))
 
-    --2nd and 3rd bytes = message sequence number, kanske
+    --2nd and 3rd bytes = message sequence number and fragmentation flag
     tree_header:add_le(f_mseq, buffer(offset +1, 2))
     tree_header:add_le(f_fragm, buffer(offset + 1, 2))
 
-    -- 4th and 5th bytes = msg length, incremented by 8.
+    -- 4th and 5th bytes = message length, incremented by 8.
     tree_header:add_le(f_len, buffer(offset + 3, 2))
 
     local func_code = buffer(offset, 1):uint()
@@ -205,6 +205,7 @@ local function heuristic_checker(buffer, pinfo, tree)
     else return false end
 end
 
+-- load the udp port table
 udp_table = DissectorTable.get("udp.port")
 
 lidgren_proto:register_heuristic("udp", heuristic_checker)
